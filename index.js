@@ -10,8 +10,6 @@ const mongo = new MongoClient(
   }`
 );
 
-const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-
 var guildCount,
   userCount,
   deletedMessagesDay,
@@ -76,28 +74,24 @@ async function writeStats() {
 async function collectStats() {
   const collection = mongo.db("eazyautodelete").collection("stats");
 
-  guildCount = formatNumber(
-    (
-      await Promise.all(
-        config.clusters.map(async cluster => {
-          const data = await collection.findOne({ cluster: cluster }, { sort: { $natural: -1 }, limit: 1 });
-
-          return data && data.guilds ? data.guilds : 0;
-        })
-      )
-    ).reduce((a, b) => a + b, 0)
+  const [cluster1, cluster2, cluster3, cluster4] = await Promise.all(
+    config.clusters.map(
+      async cluster => await collection.findOne({ cluster: cluster }, { sort: { $natural: -1 }, limit: 1 })
+    )
   );
 
   userCount = formatNumber(
-    (
-      await Promise.all(
-        config.clusters.map(async cluster => {
-          const data = await collection.findOne({ cluster: cluster }, { sort: { $natural: -1 }, limit: 1 });
+    (cluster1 && cluster1.users ? cluster1.users : 0) +
+      (cluster2 && cluster2.users ? cluster2.users : 0) +
+      (cluster3 && cluster3.users ? cluster3.users : 0) +
+      (cluster4 && cluster4.users ? cluster4.users : 0)
+  );
 
-          return data && data.users ? data.users : 0;
-        })
-      )
-    ).reduce((a, b) => a + b, 0)
+  guildCount = formatNumber(
+    (cluster1 && cluster1.guilds ? cluster1.guilds : 0) +
+      (cluster2 && cluster2.guilds ? cluster2.guilds : 0) +
+      (cluster3 && cluster3.guilds ? cluster3.guilds : 0) +
+      (cluster4 && cluster4.guilds ? cluster4.guilds : 0)
   );
 
   deletedMessagesDay = formatNumber(await getDeletedMessages(collection, day));
