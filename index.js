@@ -49,26 +49,27 @@ bot.on("interactionCreate", async interaction => {
 (async () => {
   await mongo.connect();
 
-  collectStats();
+  await collectStats();
 
   bot.login(config.token);
 })();
 
 async function writeStats() {
-  const statsChannel = await bot.channels.fetch(config.statsChannel);
-  await statsChannel.setName(
-    config.statsText.replace("{val}", formatNumber(guildCount)).replace("{val}", formatNumber(userCount))
-  );
+  const statsChannel = await bot.channels.fetch(config.statsChannel).catch(() => null);
+  statsChannel &&
+    (await statsChannel.setName(config.statsText.replace("{val}", guildCount).replace("{val}", userCount)));
 
-  const messagesFirstChannel = await bot.channels.fetch(config.messagesChannelFirst);
-  await messagesFirstChannel.setName(
-    config.messagesTextFirst.replace("{val}", deletedMessagesDay).replace("{val}", deletedMessagesWeek)
-  );
+  const messagesFirstChannel = await bot.channels.fetch(config.messagesChannelFirst).catch(() => null);
+  messagesFirstChannel &&
+    (await messagesFirstChannel.setName(
+      config.messagesTextFirst.replace("{val}", deletedMessagesDay).replace("{val}", deletedMessagesWeek)
+    ));
 
-  const messagesSecondChannel = await bot.channels.fetch(config.messagesChannelSecond);
-  await messagesSecondChannel.setName(
-    config.messagesTextSecond.replace("{val}", deletedMessagesMonth).replace("{val}", deletedMessagesYear)
-  );
+  const messagesSecondChannel = await bot.channels.fetch(config.messagesChannelSecond).catch(() => null);
+  messagesSecondChannel &&
+    (await messagesSecondChannel.setName(
+      config.messagesTextSecond.replace("{val}", deletedMessagesMonth).replace("{val}", deletedMessagesYear)
+    ));
 }
 
 async function collectStats() {
@@ -86,6 +87,7 @@ async function collectStats() {
       (cluster3 && cluster3.users ? cluster3.users : 0) +
       (cluster4 && cluster4.users ? cluster4.users : 0)
   );
+  console.log(userCount);
 
   guildCount = formatNumber(
     (cluster1 && cluster1.guilds ? cluster1.guilds : 0) +
@@ -93,11 +95,13 @@ async function collectStats() {
       (cluster3 && cluster3.guilds ? cluster3.guilds : 0) +
       (cluster4 && cluster4.guilds ? cluster4.guilds : 0)
   );
+  console.log(guildCount);
 
   deletedMessagesDay = formatNumber(await getDeletedMessages(collection, day));
   deletedMessagesWeek = formatNumber(await getDeletedMessages(collection, week));
   deletedMessagesMonth = formatNumber(await getDeletedMessages(collection, month));
   deletedMessagesYear = formatNumber(await getDeletedMessages(collection, year));
+  console.log(deletedMessagesDay, deletedMessagesWeek, deletedMessagesMonth, deletedMessagesYear);
 }
 
 const objectIdFromDate = function (date) {
@@ -107,15 +111,17 @@ const objectIdFromDate = function (date) {
 const getDeletedMessages = async function (collection, durationInMs) {
   return (
     await collection.find({ _id: { $gte: objectIdFromDate(new Date(new Date().getTime() - durationInMs)) } }).toArray()
-  ).reduce((a, b) => a + b.deletedMessages, 0);
+  ).reduce((a, b) => a + (b.deletedMessages || 0), 0);
 };
 
 const formatNumber = function (number) {
-  return number < 10_000
-    ? `${(number / 1_000).toFixed(2)}k`
+  return number < 1_000
+    ? number
+    : number < 10_000
+    ? `${(number / 1_000).toFixed(1)}k`
     : number < 100_000
     ? `${(number / 1_000).toFixed(1)}k`
     : number < 1_000_000
     ? `${Math.round(number / 1_000)}k`
-    : `${(number / 1_000_000).toFixed(2)}m`;
+    : `${(number / 1_000_000).toFixed(1)}m`;
 };
